@@ -135,31 +135,6 @@ app.get(path + '/object' + hashKeyPath + sortKeyPath, function(req, res) {
   });
 });
 
-
-/************************************
-* HTTP put method for insert object *
-*************************************/
-
-app.put(path, function(req, res) {
-
-  if (userIdPresent) {
-    req.body['userId'] = req.apiGateway.event.requestContext.identity.cognitoIdentityId || UNAUTH;
-  }
-
-  let putItemParams = {
-    TableName: tableName,
-    Item: req.body
-  }
-  dynamodb.put(putItemParams, (err, data) => {
-    if(err) {
-      res.statusCode = 500;
-      res.json({error: err, url: req.url, body: req.body});
-    } else{
-      res.json({success: 'put call succeed!', url: req.url, data: data})
-    }
-  });
-});
-
 /************************************
 * HTTP post method for insert object *
 *************************************/
@@ -170,11 +145,21 @@ app.post(path, function(req, res) {
     req.body['userId'] = req.apiGateway.event.requestContext.identity.cognitoIdentityId || UNAUTH;
   }
 
-  let putItemParams = {
+  const UpdateAttribute = req.query['vote'] === 'no' ? 'votesNo' : 'votesYes'
+
+  let updateItemParams = {
     TableName: tableName,
-    Item: req.body
+    Key: {
+      partitionKey: 'poll-001',
+      sortKey: 'total'
+    },
+    UpdateExpression: `set ${UpdateAttribute} = ${UpdateAttribute} + :val`,
+    ExpressionAttributeValues:{
+      ":val": 1
+    },
+    ReturnValues:"UPDATED_NEW"
   }
-  dynamodb.put(putItemParams, (err, data) => {
+  dynamodb.put(updateItemParams, (err, data) => {
     if(err) {
       res.statusCode = 500;
       res.json({error: err, url: req.url, body: req.body});
@@ -184,45 +169,6 @@ app.post(path, function(req, res) {
   });
 });
 
-/**************************************
-* HTTP remove method to delete object *
-***************************************/
-
-app.delete(path + '/object' + hashKeyPath + sortKeyPath, function(req, res) {
-  var params = {};
-  if (userIdPresent && req.apiGateway) {
-    params[partitionKeyName] = req.apiGateway.event.requestContext.identity.cognitoIdentityId || UNAUTH;
-  } else {
-    params[partitionKeyName] = req.params[partitionKeyName];
-     try {
-      params[partitionKeyName] = convertUrlType(req.params[partitionKeyName], partitionKeyType);
-    } catch(err) {
-      res.statusCode = 500;
-      res.json({error: 'Wrong column type ' + err});
-    }
-  }
-  if (hasSortKey) {
-    try {
-      params[sortKeyName] = convertUrlType(req.params[sortKeyName], sortKeyType);
-    } catch(err) {
-      res.statusCode = 500;
-      res.json({error: 'Wrong column type ' + err});
-    }
-  }
-
-  let removeItemParams = {
-    TableName: tableName,
-    Key: params
-  }
-  dynamodb.delete(removeItemParams, (err, data)=> {
-    if(err) {
-      res.statusCode = 500;
-      res.json({error: err, url: req.url});
-    } else {
-      res.json({url: req.url, data: data});
-    }
-  });
-});
 app.listen(3000, function() {
     console.log("App started")
 });
